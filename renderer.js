@@ -3,40 +3,50 @@
 // All of the Node.js APIs are available in this process.
 
 const desktopCapturer = require('electron').desktopCapturer
+global.localPeer
+global.remotePeer
 
-let video = document.getElementById('display')
-let mediaSources = null;
+desktopCapturer.getSources({ types: ['window', 'screen'] }).then(async sources => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        mandatory: {
+          chromeMediaSource: 'desktop',
+          chromeMediaSourceId: sources[0].id,
+          minWidth: 1280,
+          maxWidth: 1280,
+          minHeight: 720,
+          maxHeight: 720
+        }
+      }
+    })
+    handleStream(stream)
+  } catch (e) {
+    handleError(e)
+  }
+  return
+})
 
-desktopCapturer.getSources({types: [ 'screen', 'window']}, (err, sources) => {
-  mediaSources = sources
-  console.log(mediaSources)
-  /* 
-  sources.forEach(souce => {
-    source.id
-    source.name
-    source.thumbnail
-  })
-  */
-});
+function handleStream (stream) {
+  const video = document.querySelector('video')
+  video.srcObject = stream
+  video.onloadedmetadata = (e) => video.play()
+  createPeerConnection(stream)
+}
 
-navigator.mediaDevices.getUserMedia({
-  video: {
-    mandatory: {
-      chromeMediaSource: 'desktop',
-      // chromeMediaSourceId: mediaSources[0].id,
-      // minWidth: 1280,
-      // maxWidth: 1920,
-      minHeight: 1080,
-      // maxHeight: 1080
-    }
-  },
-  audio: {
-    mandatory: {
-      chromeMediaSource: 'desktop'
-    }
-  },
-}).then(stream => {
-  video.srcObject = stream;
-}).catch(err => {
-  // error
-});
+function createPeerConnection(stream) {
+  localPeer = new RTCPeerConnection()
+  localPeer.addStream(stream)
+  localPeer.createOffer(
+    (success) => {
+      localPeer.setLocalDescription(success, () => { console.log(success) }, handleError )
+    }, (fail) => {
+      handleError(fail)
+    }, { offerToReceiveAudio: 1, offerToReceiveVideo: 1} )
+}
+
+
+function handleError (e) {
+  console.log(e)
+}
+
